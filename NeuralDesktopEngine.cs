@@ -63,7 +63,7 @@ namespace Lexorama.NeuralDesktopMemoQ
         /// </summary>
         public override Image SmallIcon
         {
-            get { return Image.FromStream(Assembly.GetExecutingAssembly().GetManifestResourceStream("BabelTransTech.MosesPlus.smallmoses.bmp")); }
+            get { return Image.FromStream(Assembly.GetExecutingAssembly().GetManifestResourceStream("Lexorama.NeuralDesktopMemoQ.Icon.bmp")); }
         }
 
         /// <summary>

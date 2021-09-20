@@ -63,6 +63,7 @@
     </Compile>
     <Compile Include="NeuralDesktopPluginDirector.cs" />
     <Compile Include="NeuralDesktopSession.cs" />
+    <Compile Include="NeuralDesktopTagHandler.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RestClient.cs" />
   </ItemGroup>
