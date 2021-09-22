@@ -97,7 +97,7 @@ namespace Lexorama.NeuralDesktopMemoQ
         /// </summary>
         public override Image DisplayIcon
         {
-            get { return Image.FromStream(Assembly.GetExecutingAssembly().GetManifestResourceStream("Lexorama.NeuralDesktopMemoQ.Icon.bmp")); }
+            get { return Image.FromStream(Assembly.GetExecutingAssembly().GetManifestResourceStream("Lexorama.NeuralDesktopMemoQ.lexo.png")); }
         }
 
         /// <summary>

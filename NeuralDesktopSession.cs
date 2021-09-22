@@ -84,7 +84,7 @@ namespace Lexorama.NeuralDesktopMemoQ
         public TranslationResult[] TranslateCorrectSegment(Segment[] segs, Segment[] tmSources, Segment[] tmTargets)
         {
             TranslationResult[] results = new TranslationResult[segs.Length];
-            Dictionary<int, TranslationUnit> nonmaskedSegments = new Dictionary<int, TranslationUnit>();
+            Dictionary<int, Segment> nonmaskedSegments = new Dictionary<int, Segment>();
             TranslationResult result = new TranslationResult();
             SegmentBuilder sb = new SegmentBuilder();
             string translatedSentence;
@@ -109,17 +109,39 @@ namespace Lexorama.NeuralDesktopMemoQ
 
             int batchsize = segs.Count();
 
-            // Old
-            //for (int i = 0; i < segs.Length; i++)
-            //{
-            //    SegmentBuilder sb = new SegmentBuilder();
+
+            #region Only1segmentinbatch
+            if (batchsize == 1)
+            {
+                if (InterfaceConstants.TAGHANDLING_Auto)
+                {
+                    NeuralDesktopProviderTagPlacer tp = new NeuralDesktopProviderTagPlacer(segs[0]);
+                    translatedSentence = rClient.GetTranslation(tp.PreparedSourceText, new List<string>(), "");
+                    result.Translation = tp.GetTaggedSegment(translatedSentence);
+                }
+                else
+                {
+                    translatedSentence = rClient.GetTranslation(segs[0].PlainText, new List<string>(), "");
+                    sb.AppendString(translatedSentence);
+                    result.Translation = sb.ToSegment();
+                }
+
+                results[0] = result;
+                return results;
+                }
+            #endregion
+
+            int keepcount = 0;
+
+            int i = 0;
+            foreach (var tu in segs)
+            {
+                nonmaskedSegments.Add(i, tu);
+                i++;
+            }
 
 
-            //    results[i] = TranslateCorrectSegment(segs[i], tmSources[i], tmTargets[i]);
-            //}
-
-
-            for (int x = 0; x < Math.Ceiling((decimal)nonmaskedSegments.Count / batchsize); x++)
+            for (int x = 0; x < Math.Ceiling((decimal)nonmaskedSegments.Count() / batchsize); x++)
             {
                 var t = nonmaskedSegments.Skip(x * batchsize).Take(batchsize);
                 Dictionary<int, NeuralDesktopProviderTagPlacer> tgPlacerdict = new Dictionary<int, NeuralDesktopProviderTagPlacer>();
@@ -128,40 +150,14 @@ namespace Lexorama.NeuralDesktopMemoQ
 
                 foreach (var tu in t)
                 {
-
-
-
-                    if (InterfaceConstants.TAGHANDLING_Auto)
-                    {
-                        NeuralDesktopProviderTagPlacer tp = new NeuralDesktopProviderTagPlacer(segm);
-                        translatedSentence = rClient.GetTranslation(tp.PreparedSourceText, new List<string>(), "");
-                        result.Translation = tp.GetTaggedSegment(translatedSentence);
-                    }
-                    else
-                    {
-                        translatedSentence = rClient.GetTranslation(segm.PlainText, new List<string>(), "");
-                        sb.AppendString(translatedSentence);
-                        result.Translation = sb.ToSegment();
-                    }
-
-
-
-
-                    if (tu.Value.SourceSegment.HasTags)
-                    {
-                        var tagPlacer = new NeuralDesktopProviderTagPlacer(tu.Value.SourceSegment);
-                        tgPlacerdict.Add(tu.Key, tagPlacer);
-                        for_batchtranslation = for_batchtranslation + tagPlacer.PreparedSourceText + "\n";
-                    }
-                    else
-                    {
-                        for_batchtranslation = for_batchtranslation + tu.Value.SourceSegment.ToPlain() + "\n";
-                    }
+                    NeuralDesktopProviderTagPlacer tagPlacer = new NeuralDesktopProviderTagPlacer(tu.Value);
+                    tgPlacerdict.Add(tu.Key, tagPlacer);
+                    for_batchtranslation = for_batchtranslation + tagPlacer.PreparedSourceText + "\n";
 
                 }
 
-                translatedSentence = SearchInServer(for_batchtranslation.TrimEnd('\n'));
-                string[] batchtranslation = translatedSentence.Split('\n');
+                translatedSentence = rClient.GetTranslation(for_batchtranslation, new List<string>(), "");
+                string[] batchtranslation = translatedSentence.TrimEnd('\n').Split('\n');
 
                 if (batchtranslation.Length != t.Count())
                 {
@@ -173,68 +169,15 @@ namespace Lexorama.NeuralDesktopMemoQ
 
                     foreach (var tu in t)
                     {
-                        translation = new Segment(_languageDirection.TargetCulture);
-
-
-                        if (tu.Value.SourceSegment.HasTags)
-                        {
-
-                            translation = tgPlacerdict[tu.Key].GetTaggedSegment(batchtranslation[a].Replace(@"\n", "")).Duplicate();
-                        }
-                        else
-                        {
-                            translation.Add(batchtranslation[a].Replace(@"\n", ""));
-                        }
-                        result = CreateSearchResult(tu.Value.SourceSegment, translation, tu.Value.SourceSegment.Duplicate().ToPlain(), tu.Value.SourceSegment.HasTags);
-                        srSegments.Add(tu.Key, result);
+                        results[keepcount] = new TranslationResult();
+                        results[keepcount].Translation = tgPlacerdict[tu.Key].GetTaggedSegment(batchtranslation[a]);
                         a++;
+                        keepcount++;
                     }
 
                 }
 
-                //{
-                //    Segment translation = new Segment(_languageDirection.TargetCulture);
 
-                //    if (results.SourceSegment.HasTags)
-                //    {
-                //        var tagPlacer = new NeuralDesktopProviderTagPlacer(results.SourceSegment);
-                //        translatedSentence = SearchInServer(tagPlacer.PreparedSourceText);
-                //        translation = tagPlacer.GetTaggedSegment(translatedSentence).Duplicate();
-                //    }
-                //    else
-                //    {
-                //        var sourcetext = results.SourceSegment.ToPlain();
-                //        translatedSentence = SearchInServer(sourcetext);
-                //        translation.Add(translatedSentence);
-                //    }
-
-                //    results.Add(CreateSearchResult(segment, translation, results.SourceSegment.ToPlain(), segment.HasTags));
-                //}
-
-                i = 0;
-
-                //try
-                //{
-                foreach (var tu in translationUnits)
-                {
-                    if (mask == null || mask[i])
-                    {
-                        results_set = new SearchResults();
-                        results_set.SourceSegment = srSegments[i].MemoryTranslationUnit.SourceSegment;
-                        results_set.Add(srSegments[i]);
-                        results.Add(results_set);
-                    }
-                    else
-                    {
-                        results.Add(null);
-                    }
-                    i++;
-                }
-                //}
-                //catch (Exception ex)
-                //{
-                //    Console.WriteLine(ex.Message);
-                //}
 
 
             }
@@ -256,31 +199,13 @@ namespace Lexorama.NeuralDesktopMemoQ
         #region ISessionForStoringTranslations
         public void StoreTranslation(TranslationUnit transunit)
         {
-            //try
-            //{
-            //    MosesMTServiceHelper.StoreTranslation(options, transunit.Source.PlainText, transunit.Target.PlainText, this.srcLangCode, this.trgLangCode);
-            //}
-            //catch (Exception e)
-            //{
-            //    string localizedMessage = LocalizationHelper.Instance.GetResourceString("NetworkError");
-            //    throw new MTException(string.Format(localizedMessage, e.Message), string.Format("A network error occured ({0}).", e.Message), e);
-            //}
+
         }
 
         public int[] StoreTranslation(TranslationUnit[] transunits)
         {
 
-            //try
-            //{
-            //    return MosesMTServiceHelper.BatchStoreTranslation(options,
-            //                            transunits.Select(s => s.Source.PlainText).ToList(), transunits.Select(s => s.Target.PlainText).ToList(),
-            //                            this.srcLangCode, this.trgLangCode);
-            //}
-            //catch (Exception e)
-            //{
-            //    string localizedMessage = LocalizationHelper.Instance.GetResourceString("NetworkError");
-            //    throw new MTException(string.Format(localizedMessage, e.Message), string.Format("A network error occured ({0}).", e.Message), e);
-            //}
+
             return null;
         }
 
